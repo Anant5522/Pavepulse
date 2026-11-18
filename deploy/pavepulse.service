@@ -1,0 +1,16 @@
+[Unit]
+Description=PavePulse Road Hazard Monitoring Gunicorn Service
+After=network.target mysql.service
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/pavepulse
+Environment="PATH=/home/ubuntu/pavepulse/venv/bin"
+EnvironmentFile=/home/ubuntu/pavepulse/.env
+ExecStart=/home/ubuntu/pavepulse/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:5000 run:app --access-logfile /var/log/pavepulse/access.log --error-logfile /var/log/pavepulse/error.log
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

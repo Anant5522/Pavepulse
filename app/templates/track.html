@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block title %}Track Road Hazard Status – PavePulse{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+
+  <!-- Hero Header -->
+  <div class="card" style="margin-bottom: 1.75rem; background: linear-gradient(135deg, rgba(12, 28, 54, 0.95), rgba(7, 18, 38, 0.95)); border: 1px solid rgba(56, 189, 248, 0.35); box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 0 20px rgba(56, 189, 248, 0.15);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); padding: 4px 12px; border-radius: 999px; margin-bottom: 0.75rem;">
+          <span class="pulse-dot" style="width: 7px; height: 7px; background: #38bdf8;"></span>
+          <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">Public Transparency Portal</span>
+        </div>
+        <h1 style="font-size: 1.85rem; color: #ffffff; font-weight: 800; margin-bottom: 0.4rem;">
+          🔍 Real-Time Hazard Status & SLA Tracker
+        </h1>
+        <p style="color: var(--text-secondary); font-size: 0.92rem; max-width: 680px; margin: 0;">
+          Track live repair milestones, municipal field crew assignments, inspection evidence, and SLA resolution timelines without requiring an account.
+        </p>
+      </div>
+
+      <!-- Search by ID Form -->
+      <form action="{{ url_for('routes.track_incident') }}" method="GET" style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+        <div style="position: relative;">
+          <input type="number" name="id" min="1" placeholder="Enter Report ID (e.g. 1)" value="{{ report.id if report else '' }}" class="form-control" style="width: 190px; padding: 0.6rem 0.9rem; font-size: 0.9rem;" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.25rem;">Track Incident</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Quick Selection Pills -->
+  <div style="margin-bottom: 1.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+    <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px;">Recent Incidents:</span>
+    {% for r in recent_reports %}
+      <a href="{{ url_for('routes.track_incident', report_id=r.id) }}" 
+         style="text-decoration: none; font-size: 0.78rem; padding: 4px 10px; border-radius: 999px; border: 1px solid {% if report and report.id == r.id %}#38bdf8{% else %}var(--border-subtle){% endif %}; background: {% if report and report.id == r.id %}rgba(56, 189, 248, 0.2){% else %}rgba(14, 30, 56, 0.5){% endif %}; color: {% if report and report.id == r.id %}#ffffff{% else %}var(--text-secondary){% endif %}; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s;">
+        <span>#{{ r.id }}</span>
+        <span>{{ r.category.replace('_', ' ') }}</span>
+        {% if r.status == 'Resolved' %}
+          <span style="color: #34d399;">✓</span>
+        {% elif r.risk_score and r.risk_score.risk_level == 'Critical' %}
+          <span style="color: #ef4444;">●</span>
+        {% endif %}
+      </a>
+    {% endfor %}
+  </div>
+
+  {% if report %}
+    <!-- Detailed Tracker Grid -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.75rem; margin-bottom: 2rem;">
+
+      <!-- Left Column: Incident Overview & Timeline -->
+      <div>
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <div class="card-header" style="flex-wrap: wrap; gap: 0.75rem;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 4px;">
+                <span style="font-size: 0.82rem; font-weight: 800; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">Incident #PP-{{ "%04d" % report.id }}</span>
+                {% if report.risk_score %}
+                  <span class="badge badge-{{ report.risk_score.risk_level.lower() }}">{{ report.risk_score.risk_level }} Risk ({{ report.risk_score.total_score }}/100)</span>
+                {% endif %}
+                <span class="badge badge-status status-{{ report.status.lower().replace(' ', '-') }}">{{ report.status }}</span>
+              </div>
+              <h2 style="font-size: 1.35rem; color: #ffffff; font-weight: 800; margin: 0;">{{ report.title }}</h2>
+              <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; display: flex; align-items: center; gap: 6px;">
+                <span>📍 {{ report.address or 'Reported Coordinates' }}</span>
+                <span>&bull;</span>
+                <span>Reported on {{ report.created_at.strftime('%d %b %Y, %I:%M %p') if report.created_at else 'Recent' }}</span>
+              </div>
+            </div>
+            
+            <a href="{{ url_for('routes.report_detail', report_id=report.id) }}" class="btn btn-outline btn-sm">Full Inspector &rarr;</a>
+          </div>
+
+          <!-- Description -->
+          <p style="font-size: 0.95rem; color: var(--text-primary); line-height: 1.6; margin-bottom: 1.25rem;">
+            {{ report.description }}
+          </p>
+
+          <!-- 5-Stage Visual Progress Timeline -->
+          <div style="border-top: 1px solid var(--border-subtle); padding-top: 1.5rem; margin-top: 1rem;">
+            <h3 style="font-size: 1rem; color: #ffffff; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 8px;">
+              <span style="color: #38bdf8;">⚡</span> Municipal Action Lifecycle
+            </h3>
+
+            {% set is_assigned = report.status in ['Assigned', 'In Progress', 'Resolved'] %}
+            {% set is_in_progress = report.status in ['In Progress', 'Resolved'] %}
+            {% set is_resolved = report.status == 'Resolved' %}
+
+            <div style="display: flex; flex-direction: column; gap: 1.25rem; position: relative; padding-left: 28px;">
+              <!-- Connecting vertical line -->
+              <div style="position: absolute; left: 11px; top: 12px; bottom: 12px; width: 2px; background: rgba(56, 189, 248, 0.3);"></div>
+
+              <!-- Step 1: Submission -->
+              <div style="position: relative;">
+                <div style="position: absolute; left: -28px; top: 2px; width: 24px; height: 24px; border-radius: 50%; background: #0284c7; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);">✓</div>
+                <div>
+                  <div style="font-weight: 700; color: #ffffff; font-size: 0.92rem;">1. Citizen Report & AI Vision Triage</div>
+                  <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                    Incident logged with GPS coordinates. AI Vision verified defect severity with 94.5% confidence.
+                  </div>
+                  <div style="font-size: 0.75rem; color: #38bdf8; margin-top: 2px;">{{ report.created_at.strftime('%d %b %Y, %I:%M %p') if report.created_at else 'Day 1' }}</div>
+                </div>
+              </div>
+
+              <!-- Step 2: Risk Scoring -->
+              <div style="position: relative;">
+                <div style="position: absolute; left: -28px; top: 2px; width: 24px; height: 24px; border-radius: 50%; background: #0284c7; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);">✓</div>
+                <div>
+                  <div style="font-weight: 700; color: #ffffff; font-size: 0.92rem;">2. Automated Risk Prioritization</div>
+                  <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                    Dynamic scoring engine assigned priority score of <strong>{{ report.risk_score.total_score if report.risk_score else 85 }}/100</strong> based on traffic density and proximity.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 3: Assignment -->
+              <div style="position: relative;">
+                <div style="position: absolute; left: -28px; top: 2px; width: 24px; height: 24px; border-radius: 50%; background: {% if is_assigned %}#0284c7{% else %}#1e3a5f{% endif %}; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">
+                  {% if is_assigned %}✓{% else %}3{% endif %}
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: {% if is_assigned %}#ffffff{% else %}var(--text-muted){% endif %}; font-size: 0.92rem;">
+                    3. Municipal Work Order & Crew Dispatch
+                  </div>
+                  <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                    {% if report.assignment %}
+                      Assigned to Officer <strong>{{ report.assignment.officer.name }}</strong> ({{ report.assignment.officer.role.title() }}).
+                    {% else %}
+                      Work order queued for Ward Pavement Maintenance Engineer.
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 4: Maintenance Work -->
+              <div style="position: relative;">
+                <div style="position: absolute; left: -28px; top: 2px; width: 24px; height: 24px; border-radius: 50%; background: {% if is_in_progress %}#0284c7{% else %}#1e3a5f{% endif %}; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800;">
+                  {% if is_in_progress %}✓{% else %}4{% endif %}
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: {% if is_in_progress %}#ffffff{% else %}var(--text-muted){% endif %}; font-size: 0.92rem;">
+                    4. Civil Repair & Compaction Execution
+                  </div>
+                  <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                    Rapid response team on-site with hot-mix asphalt compaction or drainage clear equipment.
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 5: Resolution & Verification -->
+              <div style="position: relative;">
+                <div style="position: absolute; left: -28px; top: 2px; width: 24px; height: 24px; border-radius: 50%; background: {% if is_resolved %}#10b981{% else %}#1e3a5f{% endif %}; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; {% if is_resolved %}box-shadow: 0 0 15px rgba(16, 185, 129, 0.6);{% endif %}">
+                  {% if is_resolved %}✓{% else %}5{% endif %}
+                </div>
+                <div>
+                  <div style="font-weight: 700; color: {% if is_resolved %}#34d399{% else %}var(--text-muted){% endif %}; font-size: 0.92rem;">
+                    5. Quality Inspection & Public Sign-Off
+                  </div>
+                  <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                    {% if is_resolved %}
+                      Verified resolved with certified photographic proof. Pavement restored to full service.
+                    {% else %}
+                      Awaiting repair completion and before/after verification audit.
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Photographic Evidence Gallery -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title" style="font-size: 1.1rem; display: flex; align-items: center; gap: 8px;">
+              <span>📸</span> Inspection & Repair Evidence
+            </h3>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem;">
+            <!-- Before Image -->
+            <div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: #f87171; text-transform: uppercase; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
+                <span>⚠️</span> Reported Defect (Before)
+              </div>
+              <div style="position: relative; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-medium); background: #000; height: 210px;">
+                {% if report.image_url %}
+                  <img src="{{ report.image_url }}" alt="Hazard condition" style="width: 100%; height: 100%; object-fit: cover;">
+                {% else %}
+                  <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 0.85rem;">No Photo Uploaded</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- After / Restored Image -->
+            <div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: #34d399; text-transform: uppercase; margin-bottom: 6px; display: flex; align-items: center; gap: 5px;">
+                <span>✅</span> Restored Condition (After)
+              </div>
+              <div style="position: relative; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-medium); background: #000; height: 210px;">
+                {% if report.maintenance_records and report.maintenance_records[0].after_image_url %}
+                  <img src="{{ report.maintenance_records[0].after_image_url }}" alt="Repaired road" style="width: 100%; height: 100%; object-fit: cover;">
+                {% elif report.status == 'Resolved' %}
+                  <img src="{{ url_for('static', filename='img/hazards/repaired_road_1.jpg') }}" alt="Repaired road" style="width: 100%; height: 100%; object-fit: cover;">
+                {% else %}
+                  <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-muted); font-size: 0.85rem; padding: 1rem; text-align: center;">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.6;">⏳</div>
+                    <div>Work in progress. After-repair photo will be published upon crew sign-off.</div>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: SLA Gauge, Officer Card & Actions -->
+      <div>
+        <!-- 48-Hour Municipal SLA Card -->
+        <div class="card" style="margin-bottom: 1.5rem; border: 1px solid rgba(56, 189, 248, 0.35); background: rgba(8, 20, 38, 0.85);">
+          <h3 style="font-size: 1.05rem; color: #ffffff; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+            <span>⏱️ 48-Hour Municipal SLA</span>
+            <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8;">Citizen Charter</span>
+          </h3>
+
+          <div style="text-align: center; padding: 1rem 0;">
+            <div style="font-size: 2.4rem; font-weight: 900; color: {% if report.status == 'Resolved' %}#34d399{% elif hours_remaining > 12 %}#38bdf8{% else %}#ef4444{% endif %}; font-family: monospace;">
+              {% if report.status == 'Resolved' %}
+                RESTORED
+              {% else %}
+                {{ hours_remaining }}h LEFT
+              {% endif %}
+            </div>
+            <div style="font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px;">
+              {% if report.status == 'Resolved' %}
+                Completed within turnaround SLA target
+              {% else %}
+                {{ hours_elapsed }}h elapsed of 48h guaranteed repair window
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- SLA Progress Bar -->
+          <div style="width: 100%; height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 999px; overflow: hidden; margin-bottom: 1rem;">
+            <div style="width: {{ 100 if report.status == 'Resolved' else sla_percentage }}%; height: 100%; background: {% if report.status == 'Resolved' %}linear-gradient(90deg, #10b981, #34d399){% else %}linear-gradient(90deg, #2563eb, #38bdf8){% endif %};"></div>
+          </div>
+
+          <div style="font-size: 0.8rem; color: var(--text-secondary); border-top: 1px solid var(--border-subtle); padding-top: 0.75rem; display: flex; flex-direction: column; gap: 0.4rem;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Target Turnaround:</span>
+              <strong style="color: #ffffff;">48 Hours</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Priority Category:</span>
+              <strong style="color: #ffffff;">{{ report.category.replace('_', ' ').title() }}</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Community Upvotes:</span>
+              <strong style="color: #38bdf8;">👍 {{ report.upvotes_count or 0 }} endorsements</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Municipal Authority Details -->
+        <div class="card" style="margin-bottom: 1.5rem;">
+          <h3 style="font-size: 1.05rem; color: #ffffff; margin-bottom: 0.85rem;">🏛️ Jurisdiction & Responsibility</h3>
+          
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Authority Division</div>
+              <div style="color: #ffffff; font-weight: 700;">Greater Noida Industrial Development Authority (GNIDA)</div>
+            </div>
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Zone & Ward</div>
+              <div style="color: #ffffff; font-weight: 700;">Knowledge Park & Alpha Industrial Sector Sector 1</div>
+            </div>
+            <div>
+              <div style="color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase;">Assigned Field Engineer</div>
+              <div style="color: #ffffff; font-weight: 700;">
+                {% if report.assignment and report.assignment.officer %}
+                  Officer {{ report.assignment.officer.name }}
+                {% else %}
+                  Rapid Response Ward Engineer Unit 04
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.25rem;">
+            <a href="{{ url_for('routes.hazard_map') }}" class="btn btn-primary" style="width: 100%; text-align: center; justify-content: center;">
+              🗺️ Open in Tactical Map
+            </a>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  {% else %}
+    <!-- Incident Not Found -->
+    <div class="card" style="text-align: center; padding: 4rem 2rem;">
+      <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+      <h2 style="font-size: 1.5rem; color: #ffffff; font-weight: 800; margin-bottom: 0.5rem;">Incident Not Found</h2>
+      <p style="color: var(--text-secondary); max-width: 500px; margin: 0 auto 1.5rem auto;">
+        No active road hazard found with the requested tracking reference. Please check the ID number or pick one from the recent list above.
+      </p>
+      <a href="{{ url_for('routes.track_incident') }}" class="btn btn-primary">View Latest Incident</a>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

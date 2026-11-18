@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Live Geospatial Hazard Map – PavePulse{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h1 class="card-title" style="font-size: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+        <span>🗺️ Live Tactical Hazard Map</span>
+        <span style="font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">Real-Time GIS</span>
+      </h1>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
+        Geospatial tracking of potholes, broken infrastructure, and road safety hazards with dynamic risk scoring.
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+      <button id="btnToggleHeatmap" class="btn btn-outline btn-sm" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; gap: 6px;">
+        <span>🔥</span> <span id="heatmapBtnText">Density Heatmap</span>
+      </button>
+      <button id="btnToggleRadar" class="btn btn-outline btn-sm" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); display: flex; align-items: center; gap: 6px;">
+        <span class="pulse-dot" style="width: 7px; height: 7px; background: #38bdf8;"></span> 🚗 Live Driving Radar
+      </button>
+      <a href="{{ url_for('routes.report_hazard') }}" class="btn btn-primary btn-sm">+ Report New Hazard</a>
+    </div>
+  </div>
+
+  <!-- Driving Radar HUD Overlay (Hidden until activated) -->
+  <div id="radarHudPanel" style="display: none; margin-bottom: 1.25rem; background: linear-gradient(135deg, rgba(8, 24, 50, 0.96), rgba(5, 14, 30, 0.96)); border: 1px solid rgba(56, 189, 248, 0.45); border-radius: var(--radius-sm); padding: 1rem 1.25rem; box-shadow: 0 0 25px rgba(56, 189, 248, 0.25);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="width: 38px; height: 38px; border-radius: 50%; background: rgba(56, 189, 248, 0.2); border: 2px solid #38bdf8; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);">
+          📡
+        </div>
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="font-weight: 800; color: #ffffff; font-size: 1rem;">🚗 Live Driving Radar</span>
+            <span id="radarStatusPill" class="badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.4);">ACTIVE (500m SCAN)</span>
+          </div>
+          <div id="radarSpeedLocation" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+            Tracking GPS position &bull; Speed: <strong style="color: #ffffff;">45 km/h</strong> &bull; Near Pari Chowk
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+        <button type="button" id="btnSimulateDrive" class="btn btn-sm btn-outline" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.8rem;">
+          ▶️ Simulate Drive (Demo)
+        </button>
+        <button type="button" id="btnToggleVoice" class="btn btn-sm btn-outline" style="font-size: 0.8rem;">
+          🔊 Voice Alerts: <strong id="voiceStateText" style="color: #22c55e;">ON</strong>
+        </button>
+        <button type="button" id="btnCloseRadar" class="btn btn-sm btn-outline" style="font-size: 0.8rem; color: #94a3b8;">
+          ✕ Exit
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Warning Alert Box (Shows when hazard < 250m) -->
+    <div id="radarAlertBanner" style="display: none; margin-top: 0.85rem; padding: 0.75rem 1rem; border-radius: 6px; background: rgba(239, 68, 68, 0.18); border: 1px solid #ef4444; box-shadow: 0 0 15px rgba(239, 68, 68, 0.25);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <span style="font-size: 1.5rem;">⚠️</span>
+          <div>
+            <div id="radarAlertTitle" style="font-weight: 800; color: #f87171; font-size: 0.95rem;">IMMEDIATE HAZARD AHEAD</div>
+            <div id="radarAlertDesc" style="font-size: 0.82rem; color: #fca5a5;">Pothole detected 120m ahead</div>
+          </div>
+        </div>
+        <div id="radarDistanceDisplay" style="font-size: 1.4rem; font-weight: 900; color: #f87171; font-family: monospace;">
+          120m
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- High-Precision Search Box on Live Map -->
+  <div style="display: flex; gap: 0.75rem; margin-bottom: 1.25rem; align-items: center; flex-wrap: wrap;">
+    <div class="map-search-wrapper" style="position: relative; flex: 1; max-width: 520px;">
+      <input type="text" id="liveMapSearchInput" class="form-control" style="width: 100%; padding: 0.55rem 1rem; font-size: 0.9rem;" placeholder="🔍 Search any house, sector, colony or city (e.g. A block alpha 1, Sector 62, Nautanwa)..." autocomplete="off">
+      <div id="liveMapSearchSuggestions" class="search-dropdown" style="width: 100%; max-height: 280px; overflow-y: auto;"></div>
+    </div>
+    <button type="button" id="btnLiveMapSearch" class="btn btn-primary btn-sm" style="padding: 0.55rem 1.25rem;">Find Location</button>
+    <div id="liveMapSearchFeedback" style="font-size: 0.85rem; color: #34d399; display: none;"></div>
+  </div>
+
+  <!-- Interactive Filters Row -->
+  <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; background: rgba(14, 30, 56, 0.65); padding: 0.85rem 1.25rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); align-items: center;">
+    <div style="font-weight: 700; font-size: 0.85rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.4rem;">
+      <span>🎯 Filter By:</span>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <label for="categoryFilter" style="font-size: 0.85rem; color: var(--text-secondary);">Category:</label>
+      <select id="categoryFilter" class="form-control" style="width: auto; padding: 0.35rem 0.75rem; font-size: 0.85rem;">
+        <option value="all">All Categories</option>
+        <option value="pothole">Potholes</option>
+        <option value="damaged_road">Damaged Roads</option>
+        <option value="waterlogging">Waterlogging</option>
+        <option value="blocked_drain">Blocked Drains</option>
+        <option value="broken_streetlight">Broken Streetlights</option>
+        <option value="damaged_sign">Damaged Signs</option>
+      </select>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <label for="statusFilter" style="font-size: 0.85rem; color: var(--text-secondary);">Status:</label>
+      <select id="statusFilter" class="form-control" style="width: auto; padding: 0.35rem 0.75rem; font-size: 0.85rem;">
+        <option value="all">All Statuses</option>
+        <option value="Submitted">Submitted</option>
+        <option value="Under Review">Under Review</option>
+        <option value="Assigned">Assigned</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Resolved">Resolved</option>
+      </select>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <label for="riskFilter" style="font-size: 0.85rem; color: var(--text-secondary);">Risk Level:</label>
+      <select id="riskFilter" class="form-control" style="width: auto; padding: 0.35rem 0.75rem; font-size: 0.85rem;">
+        <option value="all">All Risk Levels</option>
+        <option value="Critical">🔴 Critical (80–100)</option>
+        <option value="High">🟠 High (60–79)</option>
+        <option value="Medium">🟡 Medium (30–59)</option>
+        <option value="Low">🟢 Low (0–29)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Map Container -->
+  <div id="map"></div>
+
+  <!-- Map info & Legend Row -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-top: 1.1rem;">
+    <!-- Source Badge -->
+    <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
+      <img src="https://www.openstreetmap.org/favicon.ico" width="14" height="14" alt="OSM" style="border-radius:2px;">
+      Powered by <strong style="color: #38bdf8;">Leaflet.js</strong> + <strong style="color: #38bdf8;">OpenStreetMap</strong> &bull; 100% Free &bull; Real Road Data
+    </div>
+
+    <!-- Risk Legend -->
+    <div style="display: flex; gap: 1.25rem; flex-wrap: wrap; font-size: 0.82rem; color: var(--text-secondary); align-items: center;">
+      <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <span style="width: 12px; height: 12px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 8px #ef4444; display: inline-block;"></span>
+        <span>Critical (80–100)</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <span style="width: 12px; height: 12px; border-radius: 50%; background: #f97316; box-shadow: 0 0 8px #f97316; display: inline-block;"></span>
+        <span>High (60–79)</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <span style="width: 12px; height: 12px; border-radius: 50%; background: #eab308; box-shadow: 0 0 8px #eab308; display: inline-block;"></span>
+        <span>Medium (30–59)</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.4rem;">
+        <span style="width: 12px; height: 12px; border-radius: 50%; background: #10b981; box-shadow: 0 0 8px #10b981; display: inline-block;"></span>
+        <span>Low (0–29) / Resolved</span>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/map.js') }}"></script>
+{% endblock %}

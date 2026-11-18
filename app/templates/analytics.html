@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Civic Road Analytics & Municipal Intelligence – PavePulse{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto;">
+
+  <!-- Hero Header -->
+  <div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(12, 28, 54, 0.95), rgba(7, 18, 38, 0.95)); border: 1px solid rgba(56, 189, 248, 0.35); box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 0 20px rgba(56, 189, 248, 0.15);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+      <div>
+        <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.4); padding: 4px 12px; border-radius: 999px; margin-bottom: 0.75rem;">
+          <span class="pulse-dot" style="width: 7px; height: 7px; background: #38bdf8;"></span>
+          <span style="font-size: 0.78rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;">Executive Command Analytics</span>
+        </div>
+        <h1 style="font-size: 1.85rem; color: #ffffff; font-weight: 800; margin-bottom: 0.4rem;">
+          📊 Civic Road Analytics & Infrastructure Intelligence
+        </h1>
+        <p style="color: var(--text-secondary); font-size: 0.92rem; max-width: 680px; margin: 0;">
+          Real-time geospatial KPIs, defect categorization breakdowns, resolution SLAs, and community-weighted priorities across the municipal road grid.
+        </p>
+      </div>
+
+      <!-- Quick Actions -->
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <a href="{{ url_for('routes.hazard_map') }}" class="btn btn-outline btn-sm">🗺️ Open Map</a>
+        <a href="{{ url_for('routes.track_incident') }}" class="btn btn-primary btn-sm">🔍 Track Status</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Real-Time Municipal KPI Stats Grid -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-title">Total Incidents Logged</div>
+      <div class="stat-value" style="color: #38bdf8;">{{ total_count }}</div>
+      <div class="stat-sub">Across NCR, Noida & NH-24 corridor</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-title">Active Remediation Queue</div>
+      <div class="stat-value" style="color: #fbbf24;">{{ active_count }}</div>
+      <div class="stat-sub">Under active engineering workflow</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-title">Critical High-Risk Points</div>
+      <div class="stat-value" style="color: #ef4444;">{{ critical_count }}</div>
+      <div class="stat-sub">Immediate vehicular hazard flagged</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-title">Certified Restorations</div>
+      <div class="stat-value" style="color: #34d399;">{{ resolved_count }}</div>
+      <div class="stat-sub">Passed photographic verification audit</div>
+    </div>
+  </div>
+
+  <!-- Interactive Charts Grid -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+
+    <!-- Chart 1: Category Distribution Doughnut -->
+    <div class="card" style="margin-bottom: 0;">
+      <div class="card-header">
+        <h3 class="card-title" style="font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+          <span>🍩</span> Hazard Breakdown by Category
+        </h3>
+      </div>
+      <div style="height: 280px; position: relative;">
+        <canvas id="categoryChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Chart 2: Risk Severity Matrix -->
+    <div class="card" style="margin-bottom: 0;">
+      <div class="card-header">
+        <h3 class="card-title" style="font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+          <span>⚠️</span> Risk Severity Distribution
+        </h3>
+      </div>
+      <div style="height: 280px; position: relative;">
+        <canvas id="riskChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Chart 3: Municipal Workflow Pipeline -->
+    <div class="card" style="margin-bottom: 0;">
+      <div class="card-header">
+        <h3 class="card-title" style="font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+          <span>📈</span> Resolution Workflow Pipeline
+        </h3>
+      </div>
+      <div style="height: 280px; position: relative;">
+        <canvas id="statusChart"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Community Endorsement Priority Table & Regional Summary -->
+  <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.75rem; margin-bottom: 2rem;">
+
+    <!-- Left: Top Community Upvoted Incidents -->
+    <div class="card" style="margin-bottom: 0;">
+      <div class="card-header">
+        <h3 class="card-title" style="font-size: 1.15rem; display: flex; align-items: center; gap: 8px;">
+          <span style="color: #38bdf8;">👍</span> Top Community-Voted Priority Incidents
+        </h3>
+      </div>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Democratized civic prioritization: Hazards receiving highest citizen endorsements are automatically escalated in the municipal dispatch queue.
+      </p>
+
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr>
+              <th>Incident Details</th>
+              <th>Category</th>
+              <th>Status</th>
+              <th style="text-align: right;">Endorsements</th>
+              <th style="text-align: center;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in top_voted %}
+            <tr>
+              <td>
+                <div style="font-weight: 700; color: #ffffff;">#{{ r.id }} {{ r.title }}</div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">📍 {{ r.address or 'Greater Noida' }}</div>
+              </td>
+              <td>
+                <span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">{{ r.category.replace('_', ' ') }}</span>
+              </td>
+              <td>
+                <span class="badge badge-status status-{{ r.status.lower().replace(' ', '-') }}">{{ r.status }}</span>
+              </td>
+              <td style="text-align: right;">
+                <strong style="color: #38bdf8; font-size: 0.95rem;">👍 {{ r.upvotes_count or 0 }}</strong>
+              </td>
+              <td style="text-align: center;">
+                <a href="{{ url_for('routes.track_incident', report_id=r.id) }}" class="btn btn-sm btn-outline" style="padding: 3px 8px; font-size: 0.78rem;">Track</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Right: Regional Road Grid Breakdown -->
+    <div class="card" style="margin-bottom: 0;">
+      <div class="card-header">
+        <h3 class="card-title" style="font-size: 1.15rem;">🏙️ Ward Hotspots</h3>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 1rem; font-size: 0.88rem;">
+        <div style="padding: 0.75rem; background: rgba(14, 30, 56, 0.5); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+          <div style="display: flex; justify-content: space-between; font-weight: 700; color: #ffffff;">
+            <span>Greater Noida Core (Pari Chowk/Alpha)</span>
+            <span style="color: #38bdf8;">14 Incidents</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+            High commuter density; 4 critical potholes prioritized
+          </div>
+        </div>
+
+        <div style="padding: 0.75rem; background: rgba(14, 30, 56, 0.5); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+          <div style="display: flex; justify-content: space-between; font-weight: 700; color: #ffffff;">
+            <span>Yamuna Expressway Corridor</span>
+            <span style="color: #fb923c;">5 Incidents</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+            High-speed asphalt fractures and guardrail impacts
+          </div>
+        </div>
+
+        <div style="padding: 0.75rem; background: rgba(14, 30, 56, 0.5); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+          <div style="display: flex; justify-content: space-between; font-weight: 700; color: #ffffff;">
+            <span>NH-24 & Indo-Nepal Highway</span>
+            <span style="color: #34d399;">6 Incidents</span>
+          </div>
+          <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+            Heavy freight container rutting and waterlogging
+          </div>
+        </div>
+
+        <div style="padding: 0.85rem; background: rgba(56, 189, 248, 0.1); border-radius: var(--radius-sm); border: 1px solid rgba(56, 189, 248, 0.3); text-align: center;">
+          <div style="font-size: 0.8rem; color: var(--text-secondary);">Average Municipal Turnaround</div>
+          <div style="font-size: 1.6rem; font-weight: 900; color: #38bdf8; margin: 2px 0;">4.6 Hours</div>
+          <div style="font-size: 0.75rem; color: #34d399;">✓ Within 48-Hour SLA Guarantee</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Chart Colors in Midnight Blue Aesthetic
+  const categoryLabels = {{ category_labels | tojson }};
+  const categoryCounts = {{ category_counts | tojson }};
+  
+  const riskLabels = {{ risk_labels | tojson }};
+  const riskCounts = {{ risk_counts | tojson }};
+
+  const statusLabels = {{ status_labels | tojson }};
+  const statusCounts = {{ status_counts | tojson }};
+
+  // 1. Category Chart (Doughnut)
+  const ctxCat = document.getElementById('categoryChart');
+  if (ctxCat) {
+    new Chart(ctxCat, {
+      type: 'doughnut',
+      data: {
+        labels: categoryLabels,
+        datasets: [{
+          data: categoryCounts,
+          backgroundColor: [
+            '#38bdf8', '#0ea5e9', '#2563eb', '#6366f1', '#a855f7', '#ec4899', '#f97316'
+          ],
+          borderColor: '#081426',
+          borderWidth: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { color: '#94a3b8', font: { size: 11 } }
+          }
+        }
+      }
+    });
+  }
+
+  // 2. Risk Chart (Bar)
+  const ctxRisk = document.getElementById('riskChart');
+  if (ctxRisk) {
+    new Chart(ctxRisk, {
+      type: 'bar',
+      data: {
+        labels: riskLabels,
+        datasets: [{
+          label: 'Incidents Count',
+          data: riskCounts,
+          backgroundColor: [
+            '#ef4444', '#f97316', '#eab308', '#10b981'
+          ],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: { ticks: { color: '#94a3b8' }, grid: { display: false } },
+          y: { ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(56, 189, 248, 0.1)' } }
+        }
+      }
+    });
+  }
+
+  // 3. Status Pipeline Chart (Horizontal Bar)
+  const ctxStatus = document.getElementById('statusChart');
+  if (ctxStatus) {
+    new Chart(ctxStatus, {
+      type: 'bar',
+      data: {
+        labels: statusLabels,
+        datasets: [{
+          label: 'Hazards',
+          data: statusCounts,
+          backgroundColor: [
+            '#38bdf8', '#c084fc', '#fbbf24', '#fb923c', '#34d399', '#94a3b8'
+          ],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          x: { ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(56, 189, 248, 0.1)' } },
+          y: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+        }
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

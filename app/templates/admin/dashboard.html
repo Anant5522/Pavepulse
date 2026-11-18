@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+
+{% block title %}Operations Command Center – PavePulse{% endblock %}
+
+{% block content %}
+<div class="card-header" style="border: none; padding: 0; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <h1 style="font-size: 2rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 0.6rem;">
+      <span>🛡️ Operations Command Center</span>
+      <span style="font-size: 0.75rem; padding: 3px 10px; border-radius: 999px; background: rgba(239, 68, 68, 0.15); color: #ff4d4f; border: 1px solid rgba(239, 68, 68, 0.4); font-weight: 800;">ADMIN</span>
+    </h1>
+    <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 2px;">
+      Triage incoming road hazards, monitor 100-point risk scores, assign maintenance officers, and audit repair completions.
+    </p>
+  </div>
+  <a href="{{ url_for('routes.hazard_map') }}" class="btn btn-outline btn-lg">🗺️ Live Tactical Map</a>
+</div>
+
+<!-- Operational Metrics with Animated Counters -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-title">Total Reports</div>
+    <div class="stat-value" data-target="{{ total_count }}">{{ total_count }}</div>
+    <div class="stat-sub">Across all categories</div>
+  </div>
+  <div class="stat-card" style="border-top: 3px solid #ff4d4f;">
+    <div class="stat-title">Critical Hazards</div>
+    <div class="stat-value" style="color: #ff4d4f;" data-target="{{ critical_count }}">{{ critical_count }}</div>
+    <div class="stat-sub">Score 80–100 (Urgent)</div>
+  </div>
+  <div class="stat-card" style="border-top: 3px solid #fa8c16;">
+    <div class="stat-title">High Priority</div>
+    <div class="stat-value" style="color: #fb923c;" data-target="{{ high_count }}">{{ high_count }}</div>
+    <div class="stat-sub">Score 60–79</div>
+  </div>
+  <div class="stat-card" style="border-top: 3px solid #faad14;">
+    <div class="stat-title">Pending Triage</div>
+    <div class="stat-value" style="color: #fbbf24;" data-target="{{ pending_count }}">{{ pending_count }}</div>
+    <div class="stat-sub">Submitted / In Review</div>
+  </div>
+  <div class="stat-card" style="border-top: 3px solid #52c41a;">
+    <div class="stat-title">Resolved & Fixed</div>
+    <div class="stat-value" style="color: #4ade80;" data-target="{{ resolved_count }}">{{ resolved_count }}</div>
+    <div class="stat-sub">Repairs confirmed</div>
+  </div>
+</div>
+
+<!-- Reports Management Card with Live Instant Search -->
+<div class="card">
+  <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h2 class="card-title">All Road Hazard Complaints</h2>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
+        Filter or search by keyword, priority, or category
+      </p>
+    </div>
+
+    <!-- Live Quick Search & Server Filter Form -->
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+      <input type="text" id="tableSearch" placeholder="🔍 Quick search table..." class="form-control" style="width: 200px; padding: 0.4rem 0.85rem; font-size: 0.85rem;">
+
+      <form method="GET" action="{{ url_for('routes.admin_dashboard') }}" style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center;">
+        <select name="status" class="form-control" style="width: auto; padding: 0.4rem 0.75rem; font-size: 0.85rem;" onchange="this.form.submit()">
+          <option value="all" {% if current_status == 'all' %}selected{% endif %}>All Statuses</option>
+          <option value="Submitted" {% if current_status == 'Submitted' %}selected{% endif %}>Submitted</option>
+          <option value="Under Review" {% if current_status == 'Under Review' %}selected{% endif %}>Under Review</option>
+          <option value="Assigned" {% if current_status == 'Assigned' %}selected{% endif %}>Assigned</option>
+          <option value="In Progress" {% if current_status == 'In Progress' %}selected{% endif %}>In Progress</option>
+          <option value="Resolved" {% if current_status == 'Resolved' %}selected{% endif %}>Resolved</option>
+        </select>
+
+        <select name="risk" class="form-control" style="width: auto; padding: 0.4rem 0.75rem; font-size: 0.85rem;" onchange="this.form.submit()">
+          <option value="all" {% if current_risk == 'all' %}selected{% endif %}>All Risk Levels</option>
+          <option value="Critical" {% if current_risk == 'Critical' %}selected{% endif %}>Critical</option>
+          <option value="High" {% if current_risk == 'High' %}selected{% endif %}>High</option>
+          <option value="Medium" {% if current_risk == 'Medium' %}selected{% endif %}>Medium</option>
+          <option value="Low" {% if current_risk == 'Low' %}selected{% endif %}>Low</option>
+        </select>
+
+        <select name="category" class="form-control" style="width: auto; padding: 0.4rem 0.75rem; font-size: 0.85rem;" onchange="this.form.submit()">
+          <option value="all" {% if current_category == 'all' %}selected{% endif %}>All Categories</option>
+          <option value="pothole" {% if current_category == 'pothole' %}selected{% endif %}>Potholes</option>
+          <option value="damaged_road" {% if current_category == 'damaged_road' %}selected{% endif %}>Damaged Roads</option>
+          <option value="waterlogging" {% if current_category == 'waterlogging' %}selected{% endif %}>Waterlogging</option>
+          <option value="blocked_drain" {% if current_category == 'blocked_drain' %}selected{% endif %}>Blocked Drains</option>
+          <option value="broken_streetlight" {% if current_category == 'broken_streetlight' %}selected{% endif %}>Broken Streetlights</option>
+        </select>
+      </form>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Hazard Details</th>
+          <th>Reporter</th>
+          <th>Risk Score</th>
+          <th>Status</th>
+          <th>Assigned Officer</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reports %}
+        <tr>
+          <td><strong style="color: var(--accent-cyan);">#{{ r.id }}</strong></td>
+          <td>
+            <div style="font-weight: 600; color: #ffffff;">{{ r.title }}</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: capitalize;">
+              {{ r.category.replace('_', ' ') }} &bull; 📍 {{ r.address }}
+            </div>
+            {% if r.recurrence_count > 1 %}
+              <div style="font-size: 0.78rem; font-weight: 700; color: #fb923c; margin-top: 3px;">
+                ⚠️ {{ r.recurrence_count }} duplicate complaints clustered
+              </div>
+            {% endif %}
+          </td>
+          <td style="font-size: 0.88rem; color: #cbd5e1;">{{ r.reporter.name }}</td>
+          <td>
+            {% if r.risk_score %}
+              <span class="badge badge-{{ r.risk_score.risk_level.lower() }}">
+                {{ r.risk_score.risk_level }} ({{ r.risk_score.total_score }})
+              </span>
+            {% else %}
+              <span class="badge badge-low">Low</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge-status status-{{ r.status.lower().replace(' ', '-') }}">
+              {{ r.status }}
+            </span>
+          </td>
+          <td style="font-size: 0.88rem;">
+            {% if r.assignment and r.assignment.officer %}
+              <span style="font-weight: 600; color: var(--accent-cyan);">{{ r.assignment.officer.name }}</span>
+            {% else %}
+              <span style="color: var(--text-muted); font-style: italic;">Unassigned</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('routes.report_detail', report_id=r.id) }}" class="btn btn-sm btn-outline">
+              Review / Assign &rarr;
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+            No hazard complaints match the selected filters.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

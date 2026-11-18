@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}Report #{{ report.id }} – {{ report.title }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 1.5rem;">
+  <a href="{{ url_for('routes.dashboard_redirect') }}" class="btn btn-sm btn-outline">&larr; Back to Dashboard</a>
+</div>
+
+<!-- Header Card -->
+<div class="card">
+  <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <div style="font-size: 0.82rem; text-transform: uppercase; font-weight: 800; color: var(--accent-cyan); letter-spacing: 0.05em;">
+        Hazard Record #{{ report.id }} &bull; {{ report.category.replace('_', ' ') }}
+      </div>
+      <h1 class="card-title" style="font-size: 1.8rem; margin-top: 0.35rem; color: #ffffff;">{{ report.title }}</h1>
+      <p style="font-size: 0.9rem; color: var(--text-secondary); margin-top: 0.35rem;">
+        Reported by <strong style="color: #ffffff;">{{ report.reporter.name }}</strong> on {{ report.created_at.strftime('%d %B %Y, %I:%M %p') }}
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+      <span class="badge-status status-{{ report.status.lower().replace(' ', '-') }}" style="font-size: 0.95rem; padding: 0.45rem 1rem;">
+        Status: {{ report.status }}
+      </span>
+      {% if report.risk_score %}
+        <span class="badge badge-{{ report.risk_score.risk_level.lower() }}" style="font-size: 0.95rem; padding: 0.45rem 1rem;">
+          {{ report.risk_score.risk_level }} Risk ({{ report.risk_score.total_score }}/100)
+        </span>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Duplicate Alert Banner -->
+  {% if report.is_duplicate_of %}
+    <div style="background: rgba(250, 140, 22, 0.12); border-left: 4px solid #fa8c16; padding: 1rem 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; border: 1px solid rgba(250, 140, 22, 0.3); border-left-width: 4px;">
+      <div style="font-weight: 700; color: #fb923c; font-size: 0.95rem;">ℹ️ Linked Duplicate Report</div>
+      <div style="font-size: 0.9rem; color: #fed7aa; margin-top: 0.25rem;">
+        This hazard was identified as duplicate within 100 meters of existing Report 
+        <a href="{{ url_for('routes.report_detail', report_id=report.is_duplicate_of) }}" style="font-weight: 700; color: #38bdf8; text-decoration: underline;">#{{ report.is_duplicate_of }}</a>.
+        Both reports are clustered and monitored simultaneously.
+      </div>
+    </div>
+  {% elif report.duplicates %}
+    <div style="background: rgba(16, 185, 129, 0.12); border-left: 4px solid #10b981; padding: 1rem 1.25rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem; border: 1px solid rgba(16, 185, 129, 0.3); border-left-width: 4px;">
+      <div style="font-weight: 700; color: #34d399; font-size: 0.95rem;">👥 Recurrent Hazard ({{ report.recurrence_count }} citizen reports)</div>
+      <div style="font-size: 0.9rem; color: #a7f3d0; margin-top: 0.25rem;">
+        Multiple citizens reported this problem. Recurrence score increased priority!
+        Linked duplicates: 
+        {% for dup in report.duplicates %}
+          <a href="{{ url_for('routes.report_detail', report_id=dup.id) }}" style="font-weight: 600; color: #38bdf8;">#{{ dup.id }}</a>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Grid layout: Details & Risk breakdown -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+    <!-- Left Column: Details & Images -->
+    <div>
+      <h3 style="font-size: 1.15rem; margin-bottom: 0.6rem; color: #ffffff;">Description & Context</h3>
+      <p style="color: #e2e8f0; font-size: 0.95rem; white-space: pre-line; background: rgba(30, 41, 59, 0.4); padding: 1.25rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); line-height: 1.6;">
+        {{ report.description }}
+      </p>
+
+      <div style="margin-top: 1.25rem; background: rgba(30, 41, 59, 0.4); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+        <h4 style="font-size: 0.95rem; color: var(--accent-cyan); margin-bottom: 0.5rem;">📍 Location Details</h4>
+        <div style="font-size: 0.92rem; color: #ffffff;"><strong>Address / Landmark:</strong> {{ report.address }}</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem; font-family: monospace;">
+          GPS Coordinates: {{ report.latitude }}, {{ report.longitude }}
+        </div>
+      </div>
+
+      <!-- Hazard Image & AI Vision HUD -->
+      <div style="margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+          <h4 style="font-size: 0.95rem; color: #ffffff; margin: 0;">Road Photograph (Reported Evidence)</h4>
+          <button type="button" id="btnToggleAiHud" class="btn btn-sm btn-outline" onclick="toggleAiHud()" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.78rem; padding: 3px 10px;">
+            🤖 Toggle AI Vision HUD
+          </button>
+        </div>
+
+        {% if report.image_url %}
+          <div style="position: relative; overflow: hidden; border-radius: var(--radius-sm); border: 1px solid var(--border-medium); box-shadow: var(--shadow-card);">
+            <img id="mainHazardImg" src="{{ report.image_url }}" alt="Hazard Image" style="width: 100%; max-height: 320px; object-fit: cover; display: block;">
+            
+            <!-- AI Vision HUD Overlay -->
+            <div id="aiBoundingBox" style="display: none; position: absolute; top: 24%; left: 20%; width: 56%; height: 52%; border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.15); box-shadow: 0 0 20px rgba(34, 197, 94, 0.6); pointer-events: none; border-radius: 4px;">
+              <div style="position: absolute; top: -24px; left: -2px; background: #22c55e; color: #000; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 2px; text-transform: uppercase;">
+                AI DETECTED: {{ report.category | upper }} (96.4% CONF)
+              </div>
+              <div style="position: absolute; bottom: 4px; right: 6px; font-size: 0.68rem; color: #a7f3d0; background: rgba(0,0,0,0.7); padding: 2px 6px; border-radius: 2px;">
+                Est. Cavity: 1.3m² &bull; PCI: Very Poor
+              </div>
+            </div>
+          </div>
+        {% else %}
+          <div style="padding: 2.5rem; background: rgba(30, 41, 59, 0.4); text-align: center; color: var(--text-secondary); border-radius: var(--radius-sm); border: 1px dashed var(--border-medium);">
+            No photograph attached for this report.
+          </div>
+        {% endif %}
+
+        <!-- Community Upvote & Verification Bar -->
+        <div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+          <button id="btnUpvote" class="btn btn-primary btn-sm" onclick="submitUpvote({{ report.id }})" style="display: flex; align-items: center; gap: 0.4rem;">
+            <span>👍</span>
+            <span>I Encountered This Too (<strong id="upvoteDisplay">{{ report.upvotes_count or 0 }}</strong> Confirmed)</span>
+          </button>
+          <span id="upvoteMsg" style="font-size: 0.82rem; color: #10b981; font-weight: 600; display: none;"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Risk Scoring & Maintenance -->
+    <div>
+      <!-- Risk Score Card -->
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-medium); border-radius: var(--radius-sm); padding: 1.35rem; margin-bottom: 1.5rem; position: relative;">
+        <h3 style="font-size: 1.15rem; color: #ffffff; margin-bottom: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+          <span>📊 Risk Score Breakdown</span>
+          <span style="color: var(--accent-cyan); font-weight: 800;">{{ report.risk_score.total_score if report.risk_score else 0 }}/100</span>
+        </h3>
+
+        {% if report.risk_score %}
+        <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.9rem;">
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary);">Hazard Severity (Max 40):</span>
+              <strong style="color: #ffffff;">{{ report.risk_score.severity_score }} pts</strong>
+            </div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary);">Location Impact (Max 20):</span>
+              <strong style="color: #ffffff;">{{ report.risk_score.location_impact_score }} pts</strong>
+            </div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary);">Safety Impact (Max 25):</span>
+              <strong style="color: #ffffff;">{{ report.risk_score.safety_impact_score }} pts</strong>
+            </div>
+          </div>
+          <div style="background: rgba(15, 23, 42, 0.6); padding: 0.6rem 0.85rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+            <div style="display: flex; justify-content: space-between;">
+              <span style="color: var(--text-secondary);">Recurrence / Duplicates (Max 15):</span>
+              <strong style="color: #fb923c;">{{ report.risk_score.recurrence_score }} pts</strong>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Officer Assignment Box -->
+      <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 1.35rem; margin-bottom: 1.5rem;">
+        <h3 style="font-size: 1.1rem; color: #ffffff; margin-bottom: 0.6rem;">🛠️ Maintenance Assignment</h3>
+        {% if report.assignment %}
+          <div style="font-size: 0.95rem; color: #ffffff;">
+            <strong>Officer:</strong> <span style="color: var(--accent-cyan);">{{ report.assignment.officer.name }}</span> ({{ report.assignment.officer.email }})
+          </div>
+          <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.35rem;">
+            Assigned on {{ report.assignment.assigned_at.strftime('%d %b %Y, %I:%M %p') }}
+          </div>
+          {% if report.assignment.notes %}
+            <div style="font-size: 0.88rem; color: #e2e8f0; margin-top: 0.5rem; background: rgba(15, 23, 42, 0.6); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-subtle);">
+              <strong style="color: var(--accent-cyan);">Admin Dispatch Notes:</strong> {{ report.assignment.notes }}
+            </div>
+          {% endif %}
+        {% else %}
+          <div style="color: var(--text-secondary); font-size: 0.9rem;">
+            Awaiting administrative review & officer dispatch.
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- After-Repair Proof (if available) -->
+      {% if report.maintenance_records %}
+      <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); padding: 1.35rem;">
+        <h3 style="font-size: 1.1rem; color: #34d399; margin-bottom: 0.6rem;">✅ Maintenance & Repair Evidence</h3>
+        {% for m in report.maintenance_records %}
+          <div style="margin-bottom: 1rem;">
+            <div style="font-size: 0.92rem; color: #ffffff;">
+              <strong>Officer Remarks:</strong> {{ m.remarks }}
+            </div>
+            <div style="font-size: 0.8rem; color: #6ee7b7; margin-top: 2px;">
+              Completed on {{ m.completed_at.strftime('%d %b %Y, %I:%M %p') }}
+            </div>
+            {% if m.after_image_url %}
+              <div style="margin-top: 0.75rem;">
+                <div style="font-size: 0.82rem; font-weight: 700; color: #34d399; margin-bottom: 4px;">After-Repair Photographic Proof:</div>
+                <img src="{{ m.after_image_url }}" alt="After Repair" style="width: 100%; max-height: 220px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.4);">
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- Admin Management Controls (Visible only to Admin) -->
+{% if current_user.is_authenticated and current_user.role == 'admin' %}
+<div class="card" style="border-top: 4px solid var(--accent-cyan);">
+  <div class="card-header">
+    <h2 class="card-title">⚙️ Administrator Triage & Dispatch (Report #{{ report.id }})</h2>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
+    <!-- Form 1: Assign Officer -->
+    <form method="POST" action="{{ url_for('routes.admin_assign_officer', report_id=report.id) }}">
+      <h4 style="font-size: 0.95rem; margin-bottom: 0.6rem; color: #ffffff;">Assign Maintenance Officer</h4>
+      <div class="form-group">
+        <select name="officer_id" class="form-control" required>
+          <option value="">-- Select Officer --</option>
+          {% for off in officers %}
+            <option value="{{ off.id }}" {% if report.assignment and report.assignment.officer_id == off.id %}selected{% endif %}>
+              {{ off.name }} ({{ off.email }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <input type="text" name="notes" class="form-control" placeholder="Dispatch notes (e.g. Bring cold-mix asphalt patch)...">
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">Assign Officer & Update Status</button>
+    </form>
+
+    <!-- Form 2: Change Status Directly -->
+    <form method="POST" action="{{ url_for('routes.admin_update_status', report_id=report.id) }}">
+      <h4 style="font-size: 0.95rem; margin-bottom: 0.6rem; color: #ffffff;">Update Status Directly</h4>
+      <div class="form-group">
+        <select name="status" class="form-control" required>
+          <option value="Submitted" {% if report.status == 'Submitted' %}selected{% endif %}>Submitted</option>
+          <option value="Under Review" {% if report.status == 'Under Review' %}selected{% endif %}>Under Review</option>
+          <option value="Assigned" {% if report.status == 'Assigned' %}selected{% endif %}>Assigned</option>
+          <option value="In Progress" {% if report.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+          <option value="Resolved" {% if report.status == 'Resolved' %}selected{% endif %}>Resolved</option>
+          <option value="Rejected" {% if report.status == 'Rejected' %}selected{% endif %}>Rejected</option>
+          <option value="Reopened" {% if report.status == 'Reopened' %}selected{% endif %}>Reopened</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <input type="text" name="remarks" class="form-control" placeholder="Optional audit remark...">
+      </div>
+      <button type="submit" class="btn btn-outline btn-sm">Change Status</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<!-- Officer Update Control (Visible if current user is assigned Officer) -->
+{% if current_user.is_authenticated and current_user.role in ['officer', 'admin'] %}
+<div class="card" style="border-top: 4px solid #fa8c16;">
+  <div class="card-header">
+    <h2 class="card-title">🛠️ Field Officer Repair Log & Evidence Upload</h2>
+  </div>
+
+  <form method="POST" action="{{ url_for('routes.officer_update_maintenance', report_id=report.id) }}" enctype="multipart/form-data">
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Update Status</label>
+        <select name="status" class="form-control" required>
+          <option value="In Progress" {% if report.status == 'In Progress' %}selected{% endif %}>In Progress (Work ongoing)</option>
+          <option value="Resolved" {% if report.status == 'Resolved' %}selected{% endif %}>Resolved (Repair completed)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">After-Repair Photograph</label>
+        <input type="file" name="after_image" class="form-control" accept="image/*">
+        <small style="color: var(--text-secondary); font-size: 0.8rem;">Upload photo proof of completed repair work.</small>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Maintenance Notes & Remarks *</label>
+      <textarea name="remarks" class="form-control" rows="2" required placeholder="Specify repair actions (e.g. 50kg asphalt patch compacted, cured, safety barricades removed)..."></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Save Repair Update & Evidence</button>
+  </form>
+</div>
+{% endif %}
+
+<!-- Status History Audit Timeline -->
+<div class="card">
+  <div class="card-header">
+    <h2 class="card-title">📜 Status History & Audit Trail</h2>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+    {% for h in report.status_history %}
+      <div style="display: flex; gap: 1rem; padding: 0.85rem; border-radius: var(--radius-sm); background: rgba(30, 41, 59, 0.4); border-left: 3px solid var(--accent-cyan); border: 1px solid var(--border-subtle); border-left-width: 3px;">
+        <div style="font-size: 0.85rem; color: var(--text-secondary); min-width: 140px;">
+          {{ h.changed_at.strftime('%d %b %Y, %H:%M') }}
+        </div>
+        <div>
+          <span class="badge-status status-{{ h.new_status.lower().replace(' ', '-') }}">
+            {{ h.new_status }}
+          </span>
+          <span style="font-size: 0.88rem; color: #ffffff; margin-left: 0.5rem;">
+            {{ h.remarks or 'Status updated' }}
+          </span>
+          {% if h.user %}
+            <span style="font-size: 0.8rem; color: var(--text-secondary); margin-left: 0.5rem;">
+              by <strong style="color: #cbd5e1;">{{ h.user.name }}</strong> ({{ h.user.role }})
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleAiHud() {
+  const box = document.getElementById('aiBoundingBox');
+  if (!box) return;
+  if (box.style.display === 'none' || !box.style.display) {
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+  }
+}
+
+async function submitUpvote(reportId) {
+  const btn = document.getElementById('btnUpvote');
+  const countSpan = document.getElementById('upvoteDisplay');
+  const msg = document.getElementById('upvoteMsg');
+
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/report/${reportId}/upvote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.success) {
+      countSpan.textContent = data.upvotes_count;
+      msg.textContent = data.message;
+      msg.style.display = 'inline';
+      btn.style.background = 'rgba(16, 185, 129, 0.2)';
+      btn.style.borderColor = '#10b981';
+      btn.innerHTML = `<span>✅ Confirmed (${data.upvotes_count})</span>`;
+    } else {
+      msg.textContent = data.message || 'Already confirmed!';
+      msg.style.color = '#fbbf24';
+      msg.style.display = 'inline';
+    }
+  } catch (err) {
+    console.error('Upvote failed:', err);
+    msg.textContent = 'Could not record vote. Please log in.';
+    msg.style.color = '#f87171';
+    msg.style.display = 'inline';
+  } finally {
+    setTimeout(() => { btn.disabled = false; }, 1000);
+  }
+}
+</script>
+{% endblock %}

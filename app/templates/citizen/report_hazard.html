@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Report a Road Hazard – PavePulse{% endblock %}
+
+{% block content %}
+<div style="max-width: 820px; margin: 1rem auto 3rem auto;">
+  <div class="card" style="box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);">
+    <div class="card-header">
+      <div>
+        <h1 class="card-title" style="font-size: 1.6rem;">⚠️ Report a Road Hazard</h1>
+        <p style="font-size: 0.88rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Pinpoint the issue on the dark map, provide road details, and our risk engine will calculate priority.
+        </p>
+      </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('routes.report_hazard') }}" enctype="multipart/form-data">
+      <!-- Title & Category -->
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="title" class="form-label">Hazard Title *</label>
+          <input type="text" id="title" name="title" class="form-control" required placeholder="e.g. Deep pothole causing two-wheeler skids">
+        </div>
+        <div class="form-group">
+          <label for="category" class="form-label">Hazard Category *</label>
+          <select id="category" name="category" class="form-control" required>
+            <option value="pothole">Severe Pothole</option>
+            <option value="damaged_road">Damaged / Broken Asphalt</option>
+            <option value="waterlogging">Severe Waterlogging</option>
+            <option value="blocked_drain">Blocked Stormwater Drain</option>
+            <option value="broken_streetlight">Broken Streetlight</option>
+            <option value="damaged_sign">Damaged Traffic Sign</option>
+            <option value="other">Other Road Hazard</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label for="description" class="form-label">Detailed Description *</label>
+        <textarea id="description" name="description" class="form-control" rows="3" required placeholder="Describe the size, depth, or specific danger (e.g. 1.2m wide pothole with sharp asphalt edges near school gate)..."></textarea>
+      </div>
+
+      <!-- Street / Landmark -->
+      <div class="form-group">
+        <label for="address" class="form-label">Landmark or Street Name</label>
+        <input type="text" id="address" name="address" class="form-control" placeholder="e.g. Pari Chowk Roundabout, near Pillar 42, Greater Noida">
+      </div>
+
+      <!-- Road & Safety Factors (for Risk Engine) -->
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="road_type" class="form-label">Road Classification</label>
+          <select id="road_type" name="road_type" class="form-control">
+            <option value="arterial">Main City Road / Arterial</option>
+            <option value="highway">High-Speed Highway / Expressway</option>
+            <option value="school_zone">School / Hospital Zone</option>
+            <option value="commercial">Commercial / Market Area</option>
+            <option value="residential">Residential Colony Road</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="accident_risk" class="form-label">Immediate Safety Threat</label>
+          <select id="accident_risk" name="accident_risk" class="form-control">
+            <option value="high">High (Direct collision or rim destruction risk)</option>
+            <option value="moderate" selected>Moderate (Vehicle slowing / minor hazard)</option>
+            <option value="low">Low (Minor inconvenience)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Photograph Upload & AI Vision Inspector -->
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
+          <label for="image" class="form-label" style="margin: 0;">Photograph of Hazard (Cloud S3 Upload)</label>
+          <button type="button" id="btnLoadSampleImg" class="btn btn-sm btn-outline" style="border-color: rgba(56, 189, 248, 0.4); color: #38bdf8; font-size: 0.78rem; padding: 2px 10px;">
+            📸 Test with Sample Road Photo
+          </button>
+        </div>
+        <input type="file" id="image" name="image" class="form-control" accept="image/*">
+        <small style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px; display: block;">Supported: JPG, PNG, WEBP (Max 10MB). Stored securely in cloud storage.</small>
+        
+        <!-- Image Preview & AI Scanner Container -->
+        <div id="aiScanContainer" style="display: none; position: relative; margin-top: 0.85rem; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border-medium); background: #000;">
+          <img id="imagePreview" src="" alt="Preview" style="display: block; width: 100%; max-height: 280px; object-fit: cover;">
+          
+          <!-- Bounding Box HUD Overlay -->
+          <div id="aiScanBoundingBox" style="position: absolute; top: 22%; left: 20%; width: 58%; height: 52%; border: 2px solid #22c55e; background: rgba(34, 197, 94, 0.15); box-shadow: 0 0 20px rgba(34, 197, 94, 0.5); pointer-events: none; border-radius: 4px;">
+            <div id="aiScanLabel" style="position: absolute; top: -24px; left: -2px; background: #22c55e; color: #000; font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 2px; text-transform: uppercase;">
+              AI INFERENCE: POTHOLE (96.8% CONF)
+            </div>
+            <div id="aiScanMetrics" style="position: absolute; bottom: 4px; right: 6px; font-size: 0.68rem; color: #a7f3d0; background: rgba(0,0,0,0.8); padding: 2px 6px; border-radius: 2px;">
+              Est. Cavity: 1.35m² &bull; Depth: 14.5cm &bull; Severity: Critical
+            </div>
+          </div>
+        </div>
+
+        <!-- AI Telemetry & Auto-Fill Action Bar -->
+        <div id="aiTelemetryBar" style="display: none; margin-top: 0.75rem; padding: 0.85rem 1rem; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-sm); align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <div style="font-size: 0.85rem; font-weight: 700; color: #34d399; display: flex; align-items: center; gap: 0.4rem;">
+              <span>🤖 AI Vision Inspection Complete</span>
+              <span id="aiConfPill" class="badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e; font-size: 0.7rem;">96.8% Match</span>
+            </div>
+            <div id="aiTelemetryText" style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 2px;">
+              Pavement Condition Index (PCI): 18/100 (Very Poor). High vehicle rim damage risk detected.
+            </div>
+          </div>
+          <button type="button" id="btnApplyAiFill" class="btn btn-sm btn-primary" style="font-size: 0.8rem; padding: 4px 12px;">
+            ⚡ Auto-Fill Form from AI Scan
+          </button>
+        </div>
+      </div>
+
+      <!-- GPS Map Picker -->
+      <div class="form-group">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; flex-wrap: wrap; gap: 0.75rem;">
+          <label class="form-label" style="margin-bottom: 0;">📍 Pinpoint Exact Location on Map *</label>
+          
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <!-- Google Maps-Style Precision Search -->
+            <div class="map-search-wrapper">
+              <input type="text" id="mapSearchInput" class="form-control" style="width: 290px; padding: 0.45rem 0.85rem; font-size: 0.85rem;" placeholder="🔍 e.g. A block alpha 1, Sector 62, Nautanwa..." autocomplete="off">
+              <button type="button" id="mapSearchBtn" class="btn btn-sm btn-primary">Find</button>
+              <div id="searchSuggestions" class="search-dropdown" style="width: 340px;"></div>
+            </div>
+            <button type="button" id="locateMeBtn" class="btn btn-sm btn-outline">📡 Detect My GPS Location</button>
+          </div>
+        </div>
+        <div id="searchFeedback" style="font-size: 0.82rem; color: var(--accent-coral); margin-bottom: 0.4rem; display: none;"></div>
+        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+          Search any location above, drag the pin, or click anywhere on the map to set coordinates.
+        </div>
+        <div id="pickerMap"></div>
+
+        <div class="form-grid" style="margin-top: 0.85rem;">
+          <div>
+            <label for="latitude" class="form-label">Latitude</label>
+            <input type="text" id="latitude" name="latitude" class="form-control" readonly required style="font-family: monospace;">
+          </div>
+          <div>
+            <label for="longitude" class="form-label">Longitude</label>
+            <input type="text" id="longitude" name="longitude" class="form-control" readonly required style="font-family: monospace;">
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-primary btn-lg" style="flex: 1;">🚀 Submit Road Hazard</button>
+        <a href="{{ url_for('routes.citizen_dashboard') }}" class="btn btn-outline btn-lg">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.GOOGLE_MAPS_API_KEY = "{{ google_maps_api_key or '' }}";
+</script>
+{% if google_maps_api_key %}
+<script src="https://maps.googleapis.com/maps/api/js?key={{ google_maps_api_key }}&libraries=places"></script>
+{% endif %}
+<script src="{{ url_for('static', filename='js/report.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Field Officer Workstation – PavePulse{% endblock %}
+
+{% block content %}
+<div class="card-header" style="border: none; padding: 0; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+  <div>
+    <h1 style="font-size: 2rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 0.6rem;">
+      <span>🛠️ Maintenance Field Workstation</span>
+      <span style="font-size: 0.75rem; padding: 3px 10px; border-radius: 999px; background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); font-weight: 800;">OFFICER</span>
+    </h1>
+    <p style="color: var(--text-secondary); font-size: 0.95rem; margin-top: 2px;">
+      Logged in as <strong style="color: #ffffff;">{{ current_user.name }}</strong> &bull; Manage assigned road repairs, update progress, and upload after-repair evidence.
+    </p>
+  </div>
+  <a href="{{ url_for('routes.hazard_map') }}" class="btn btn-outline btn-lg">🗺️ View Hazard Map</a>
+</div>
+
+<!-- Quick Stats with Animated Counters -->
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="stat-title">Assigned to Me</div>
+    <div class="stat-value" data-target="{{ assigned_reports|length }}">{{ assigned_reports|length }}</div>
+    <div class="stat-sub">Total assignments</div>
+  </div>
+  <div class="stat-card" style="border-top: 3px solid #fa8c16;">
+    <div class="stat-title">Active / In Progress</div>
+    <div class="stat-value" style="color: #fb923c;" data-target="{{ in_progress|length }}">{{ in_progress|length }}</div>
+    <div class="stat-sub">Under active repair</div>
+  </div>
+  <div class="stat-card" style="border-top: 3px solid #faad14;">
+    <div class="stat-title">Awaiting Dispatch</div>
+    <div class="stat-value" style="color: #fbbf24;" data-target="{{ pending|length }}">{{ pending|length }}</div>
+    <div class="stat-sub">Assigned by admin</div>
+  </div>
+  <div class="stat-card" style="border-top: 3px solid #52c41a;">
+    <div class="stat-title">Repaired & Resolved</div>
+    <div class="stat-value" style="color: #4ade80;" data-target="{{ completed|length }}">{{ completed|length }}</div>
+    <div class="stat-sub">Fixed with photo proof</div>
+  </div>
+</div>
+
+<!-- Assigned Tasks List -->
+<div class="card">
+  <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h2 class="card-title">My Assigned Road Repairs</h2>
+      <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px;">
+        Update status, add field notes, and upload photo proof
+      </p>
+    </div>
+    <input type="text" id="tableSearch" placeholder="🔍 Filter repairs..." class="form-control" style="width: 200px; padding: 0.4rem 0.85rem; font-size: 0.85rem;">
+  </div>
+
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Hazard & Location</th>
+          <th>Risk Priority</th>
+          <th>Current Status</th>
+          <th>Assigned Date</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in assigned_reports %}
+        <tr>
+          <td><strong style="color: var(--accent-cyan);">#{{ r.id }}</strong></td>
+          <td>
+            <div style="font-weight: 600; color: #ffffff;">{{ r.title }}</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); text-transform: capitalize;">
+              {{ r.category.replace('_', ' ') }} &bull; 📍 {{ r.address }}
+            </div>
+            {% if r.recurrence_count > 1 %}
+              <div style="font-size: 0.78rem; font-weight: 700; color: #fb923c; margin-top: 2px;">
+                ⚠️ {{ r.recurrence_count }} citizen reports combined
+              </div>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.risk_score %}
+              <span class="badge badge-{{ r.risk_score.risk_level.lower() }}">
+                {{ r.risk_score.risk_level }} ({{ r.risk_score.total_score }})
+              </span>
+            {% else %}
+              <span class="badge badge-low">Low</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge-status status-{{ r.status.lower().replace(' ', '-') }}">
+              {{ r.status }}
+            </span>
+          </td>
+          <td style="font-size: 0.85rem; color: var(--text-secondary);">
+            {% if r.assignment %}
+              {{ r.assignment.assigned_at.strftime('%d %b %Y') }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('routes.report_detail', report_id=r.id) }}" class="btn btn-sm btn-primary">
+              🛠️ Update Repair & Proof &rarr;
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+            No hazards currently assigned to you. Great job keeping the roads clear!
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
